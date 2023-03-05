@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    </head>
+    <script src="https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <body>
+    <h2>Measmerize Software Engineering Technical Assessment</h2>
+    <br>
+    <input type="file" id="myFile">
+    </body>
+    <script type="application/javascript">
+
+        const nodeArray = new Array();
+        let arrayLength = 0;
+        let input = document.getElementById("myFile");
+
+        //input and output Json files
+        input.addEventListener("change", function () {
+            if (this.files && this.files[0]) {
+                let myFile = this.files[0];
+                let reader = new FileReader();
+                
+                reader.addEventListener('load', function (e) {
+
+                    //read the Json content from the file
+                    readNode(e.target.result);
+
+                    //sort out output object
+                    let output = sortOutNode(1, null);
+
+                    //format to Json
+                    let outputStr = JSON.stringify(output, null, 2);
+
+                    console.log(outputStr);
+
+                    //output file
+                    const a = document.createElement('a');
+                    const blob = new Blob([outputStr], {type: 'text/plain'});
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'outputNode.js'; //filename to download
+                    a.click();
+
+                    alert("The output nodes Json file was downloaded as outputNode.js !");
+
+                });
+                
+                reader.readAsBinaryString(myFile);
+
+            }   
+        });
+
+
+
+        //read the node json and convert to array, and add new keys
+        function readNode(nodeJsonText){
+            
+            let nodeObj = JSON.parse(nodeJsonText);
+
+            //convert json to array, and add 3 keys for sorting out late
+            for (const [key1, value1] of Object.entries(nodeObj)) {
+                nodeArray[key1] = new Array();
+                for (const [key2, value2] of Object.entries(value1)) {
+                    nodeArray[key1][key2] = value2;   
+                    nodeArray[key1]["tier"] = 0;  
+                    nodeArray[key1]["order"] = 0; 
+                    nodeArray[key1]["output"] = 0;                                                                          
+                }            
+            }
+
+            arrayLength = nodeArray.length;
+
+            //get tier for every node
+            for (let i = 0; i < arrayLength; i++) {
+                for (let j = 0; j < arrayLength; j++) {
+                    if(nodeArray[j]["tier"] > 0){
+                        continue;
+                    }
+                    let parentId = nodeArray[j]["parentId"];
+                    if(parentId == null){
+                        nodeArray[j]["tier"] = 1;
+                        continue;               
+                    } 
+                    for (let k = 0; k < arrayLength; k++) {
+                        if(parentId == nodeArray[k]["nodeId"] && nodeArray[k]["tier"] > 0){
+                            nodeArray[j]["tier"] = nodeArray[k]["tier"] + 1;
+                            break;                             
+                        }
+                    }
+                }               
+            }
+
+
+            //get order for every node
+            for (let i = 0; i < arrayLength; i++) {
+                for (let j = 0; j < arrayLength; j++) {
+                    if(nodeArray[j]["order"] > 0){
+                        continue;
+                    }
+                    let previousSiblingId = nodeArray[j]["previousSiblingId"];
+                    if(previousSiblingId == null){
+                        nodeArray[j]["order"] = 1;
+                        continue;
+                    }
+                    for (let k = 0; k < arrayLength; k++) {
+                        if(previousSiblingId == nodeArray[k]["nodeId"] && nodeArray[k]["order"] > 0){
+                            nodeArray[j]["order"] = nodeArray[k]["order"] + 1;
+                            break;                             
+                        }
+                    }
+                }               
+            }
+        }
+
+
+        //sort out node
+        function sortOutNode(tier, parentId){
+            let output = [];   
+            let outputNo = 0;         
+            for (let i = 0; i < arrayLength; i++) {
+                outputNo++;
+                for (let j = 0; j < arrayLength; j++) {
+                    //if the node has been sorted out, continue
+                    if(nodeArray[j]["output"] > 0){
+                        continue;
+                    }
+                    //get json object for node in the same child tier
+                    if(nodeArray[j]["tier"] == tier && nodeArray[j]["parentId"] == parentId && nodeArray[j]["order"] == outputNo){
+                        let jsonObj = {};
+                        jsonObj.nodeId = nodeArray[j]["nodeId"];
+                        jsonObj.name = nodeArray[j]["name"];
+                        jsonObj.parentId = nodeArray[j]["parentId"];                        
+                        jsonObj.previousSiblingId = nodeArray[j]["previousSiblingId"]; 
+                        jsonObj.children = sortOutNode(nodeArray[j]["tier"] + 1, nodeArray[j]["nodeId"]);                     
+                        
+                        output.push(jsonObj);
+
+                        nodeArray[j]["output"] = 1;
+                    }
+                }               
+            }
+
+            return output;
+        }
+    </script>
+
+</html>
